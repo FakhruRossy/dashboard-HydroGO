@@ -6,20 +6,15 @@
 
   // State untuk data real-time, ditambahkan ph_v dan tds_v untuk kelengkapan
   let latestLog = { ph: '...', tds: '...', ph_auto: '...', created_at: null, ph_v: '...', tds_v: '...' };
-  // ... (kode state lain tidak berubah) ...
+  
   let loading = true;
   let error = null;
   let channel;
   let historicalData = [];
   let chartCanvas;
   let chartInstance;
-  let wifiSsid = '';
-  let wifiPassword = '';
-  let isSaving = false;
-  let saveMessage = '';
-  let saveError = '';
 
-  // State baru untuk fitur tambahan
+  // State untuk fitur tambahan
   let isExporting = false;
   let exportMessage = '';
   let exportError = '';
@@ -28,7 +23,6 @@
   let clearError = '';
 
   // ## LOGIKA TEMA YANG DISEMPURNAKAN ##
-  // State untuk Light/Dark Mode dengan penyimpanan di localStorage
   const createPersistentTheme = () => {
     if (typeof window === 'undefined') {
       return writable('light'); // Default di server
@@ -130,28 +124,6 @@
   // Re-render chart saat theme berubah
   $: if (chartInstance) updateChart();
 
-  // Fungsi untuk update WiFi
-  async function handleWifiUpdate() {
-    isSaving = true;
-    saveMessage = '';
-    saveError = '';
-    try {
-      const { error } = await supabase
-        .from('wifi_config')
-        .update({ ssid: wifiSsid, password: wifiPassword })
-        .eq('id', 1);
-
-      if (error) throw error;
-      saveMessage = '✅ Konfigurasi WiFi berhasil disimpan!';
-      setTimeout(() => saveMessage = '', 3000);
-    } catch (err) {
-      saveError = '❌ Gagal menyimpan: ' + err.message;
-      setTimeout(() => saveError = '', 3000);
-    } finally {
-      isSaving = false;
-    }
-  }
-
   // ## FUNGSI BARU: EKSPOR SEMUA DATA ##
   async function exportAllDataToCsv() {
     isExporting = true;
@@ -220,7 +192,7 @@
       
       clearMessage = '✅ Semua log sensor berhasil dihapus!';
       setTimeout(() => clearMessage = '', 3000);
-    } catch (err) { // INI BAGIAN YANG DIPERBAIKI
+    } catch (err) {
       clearError = '❌ Gagal menghapus log: ' + err.message;
       setTimeout(() => clearError = '', 3000);
     } finally {
@@ -238,12 +210,6 @@
       if (historyError) throw historyError;
       if (history) historicalData = history.reverse();
 
-      const { data: wifi, error: wifiError } = await supabase.from('wifi_config').select('ssid, password').eq('id', 1).maybeSingle();
-       if (wifiError && wifiError.code !== 'PGRST116') throw wifiError;
-      if (wifi) {
-        wifiSsid = wifi.ssid;
-        wifiPassword = wifi.password;
-      }
     } catch (e) {
       error = e.message;
     } finally {
@@ -296,17 +262,19 @@
         </div>
       {:else}
         <!-- Bagian Kartu Data -->
-        <!-- ## PERUBAHAN DI SINI ## -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/30 dark:hover:shadow-blue-400/20 cursor-pointer">
+          <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/50 dark:hover:shadow-blue-400/40 cursor-pointer">
             <h2 class="text-lg font-semibold text-slate-500 dark:text-slate-400">pH Air</h2>
-            <p class="text-5xl font-bold my-4 text-blue-600 dark:text-blue-400">{latestLog.ph}</p>
+            <!-- ## PERUBAHAN DI SINI ## -->
+            <p class="text-5xl font-bold my-4 text-blue-600 dark:text-blue-400">
+              {typeof latestLog.ph === 'number' ? latestLog.ph.toFixed(2) : latestLog.ph}
+            </p>
           </div>
-          <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/30 dark:hover:shadow-green-400/20 cursor-pointer">
+          <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/50 dark:hover:shadow-green-400/40 cursor-pointer">
             <h2 class="text-lg font-semibold text-slate-500 dark:text-slate-400">TDS (ppm)</h2>
             <p class="text-5xl font-bold my-4 text-green-600 dark:text-green-400">{latestLog.tds}</p>
           </div>
-          <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl hover:shadow-amber-500/30 dark:hover:shadow-amber-400/20 cursor-pointer">
+          <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl hover:shadow-amber-500/50 dark:hover:shadow-amber-400/40 cursor-pointer">
             <h2 class="text-lg font-semibold text-slate-500 dark:text-slate-400">Siklus Pompa pH</h2>
             <p class="text-5xl font-bold my-4 text-amber-600 dark:text-amber-400">{latestLog.ph_auto}</p>
             <span class="text-sm text-slate-400">kali</span>
@@ -334,29 +302,6 @@
             <div class="h-80 relative">
                 <canvas bind:this={chartCanvas}></canvas>
             </div>
-        </div>
-
-        <!-- Bagian Form WiFi -->
-        <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg mb-6">
-            <h2 class="text-xl font-bold mb-4 text-slate-900 dark:text-white">Konfigurasi WiFi Alat</h2>
-            <form on:submit|preventDefault={handleWifiUpdate} class="space-y-4">
-                <div>
-                    <label for="ssid" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Nama WiFi (SSID)</label>
-                    <input type="text" id="ssid" bind:value={wifiSsid} class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Password</label>
-                    <input type="password" id="password" bind:value={wifiPassword} class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                </div>
-                <div class="flex items-center gap-4 pt-2">
-                    <button type="submit" disabled={isSaving}
-                            class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-slate-400 dark:disabled:bg-slate-600 transition-all">
-                        {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
-                    </button>
-                    {#if saveMessage}<p class="text-sm text-green-600 dark:text-green-400">{saveMessage}</p>{/if}
-                    {#if saveError}<p class="text-sm text-red-600 dark:text-red-400">{saveError}</p>{/if}
-                </div>
-            </form>
         </div>
 
         <!-- ## BAGIAN BARU: ZONA BERBAHAYA ## -->
