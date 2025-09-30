@@ -245,7 +245,7 @@
     
     <header class="max-w-7xl mx-auto p-4 md:p-8 flex justify-between items-center">
       <div>
-        <h1 class="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">💧 Dashboard Hidroponik</h1>
+        <h1 class="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">💧 Dashboard HydroGO</h1>
         <p class="text-slate-500 dark:text-slate-400 mt-1">
           {#if loading} Mencari data...
           {:else if latestLog.created_at} Data terakhir: {new Date(latestLog.created_at).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'medium' })}
@@ -306,7 +306,7 @@
 
         <!-- ## BAGIAN BARU: ZONA BERBAHAYA ## -->
         <div class="bg-red-50 dark:bg-slate-800/50 border border-red-200 dark:border-red-900/50 p-6 rounded-xl shadow-lg">
-            <h2 class="text-xl font-bold mb-2 text-red-800 dark:text-red-300">Zona Berbahaya</h2>
+            <h2 class="text-xl font-bold mb-2 text-red-800 dark:text-red-300">Clear Data</h2>
             <p class="text-slate-600 dark:text-slate-400 mb-4 text-sm">Tindakan berikut bersifat permanen dan tidak dapat diurungkan. Lanjutkan dengan hati-hati.</p>
             <div class="flex items-center gap-4">
                 <button on:click={handleClearLogs} disabled={isClearing}
