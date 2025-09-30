@@ -4,15 +4,17 @@
   import { supabase } from '$lib/supabaseClient';
   import { Chart } from 'chart.js/auto';
 
-  // State untuk data real-time, ditambahkan ph_v dan tds_v untuk kelengkapan
+  // State untuk data real-time
   let latestLog = { ph: '...', tds: '...', ph_auto: '...', created_at: null, ph_v: '...', tds_v: '...' };
   
   let loading = true;
   let error = null;
   let channel;
   let historicalData = [];
-  let chartCanvas;
-  let chartInstance;
+
+  // ## PERUBAHAN DI SINI: Variabel untuk 3 grafik terpisah ##
+  let phChartCanvas, tdsChartCanvas, voltageChartCanvas;
+  let phChartInstance, tdsChartInstance, voltageChartInstance;
 
   // State untuk fitur tambahan
   let isExporting = false;
@@ -22,70 +24,108 @@
   let clearMessage = '';
   let clearError = '';
 
-  // ## LOGIKA TEMA YANG DISEMPURNAKAN ##
+  // Logika Tema (tidak berubah)
   const createPersistentTheme = () => {
-    if (typeof window === 'undefined') {
-      return writable('light'); // Default di server
-    }
-    
+    if (typeof window === 'undefined') return writable('light');
     const storedTheme = localStorage.getItem('theme');
     const userPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const initialTheme = storedTheme || (userPrefersDark ? 'dark' : 'light');
-    
     const theme = writable(initialTheme);
-
     theme.subscribe(value => {
       localStorage.setItem('theme', value);
-      if (value === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+      document.documentElement.classList.toggle('dark', value === 'dark');
     });
-
     return theme;
   };
-  
   const theme = createPersistentTheme();
 
-  // Fungsi untuk menggambar atau update grafik
-  function updateChart() {
-    if (chartInstance) {
-      chartInstance.destroy();
+  // Opsi umum untuk semua grafik agar konsisten
+  const getChartOptions = () => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: { 
+        beginAtZero: false,
+        ticks: { color: $theme === 'dark' ? '#cbd5e1' : '#475569' }
+      },
+      x: {
+        ticks: { color: $theme === 'dark' ? '#cbd5e1' : '#475569' }
+      }
+    },
+    plugins: {
+      legend: {
+        labels: { color: $theme === 'dark' ? '#cbd5e1' : '#475569' }
+      }
     }
-    if (!chartCanvas) return; // Tetap render canvas kosong jika tidak ada data
+  });
 
+  // ## FUNGSI GRAFIK DIPISAH ##
+
+  // Fungsi untuk menggambar grafik pH
+  function updatePhChart() {
+    if (phChartInstance) phChartInstance.destroy();
+    if (!phChartCanvas) return;
     const labels = historicalData.map(d => new Date(d.created_at).toLocaleTimeString('id-ID'));
     const phData = historicalData.map(d => d.ph);
+
+    phChartInstance = new Chart(phChartCanvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'pH Air',
+          data: phData,
+          borderColor: $theme === 'dark' ? 'rgb(96, 165, 250)' : 'rgb(59, 130, 246)',
+          backgroundColor: $theme === 'dark' ? 'rgba(96, 165, 250, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+          tension: 0.3,
+          fill: true,
+        }]
+      },
+      options: getChartOptions()
+    });
+  }
+
+  // Fungsi untuk menggambar grafik TDS
+  function updateTdsChart() {
+    if (tdsChartInstance) tdsChartInstance.destroy();
+    if (!tdsChartCanvas) return;
+    const labels = historicalData.map(d => new Date(d.created_at).toLocaleTimeString('id-ID'));
     const tdsData = historicalData.map(d => d.tds);
+
+    tdsChartInstance = new Chart(tdsChartCanvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'TDS (ppm)',
+          data: tdsData,
+          borderColor: $theme === 'dark' ? 'rgb(74, 222, 128)' : 'rgb(22, 163, 74)',
+          backgroundColor: $theme === 'dark' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(22, 163, 74, 0.1)',
+          tension: 0.3,
+          fill: true,
+        }]
+      },
+      options: getChartOptions()
+    });
+  }
+
+  // Fungsi untuk menggambar grafik Tegangan
+  function updateVoltageChart() {
+    if (voltageChartInstance) voltageChartInstance.destroy();
+    if (!voltageChartCanvas) return;
+    const labels = historicalData.map(d => new Date(d.created_at).toLocaleTimeString('id-ID'));
     const phVData = historicalData.map(d => d.ph_v);
     const tdsVData = historicalData.map(d => d.tds_v);
 
-    chartInstance = new Chart(chartCanvas, {
+    voltageChartInstance = new Chart(voltageChartCanvas, {
       type: 'line',
       data: {
-        labels: labels,
+        labels,
         datasets: [
-          {
-            label: 'pH Air',
-            data: phData,
-            borderColor: $theme === 'dark' ? 'rgb(96, 165, 250)' : 'rgb(59, 130, 246)',
-            backgroundColor: $theme === 'dark' ? 'rgba(96, 165, 250, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-            tension: 0.3,
-            fill: true,
-          },
-          {
-            label: 'TDS (ppm)',
-            data: tdsData,
-            borderColor: $theme === 'dark' ? 'rgb(74, 222, 128)' : 'rgb(22, 163, 74)',
-            backgroundColor: $theme === 'dark' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(22, 163, 74, 0.1)',
-            tension: 0.3,
-            fill: true,
-          },
           {
             label: 'pH Voltage',
             data: phVData,
-            borderColor: $theme === 'dark' ? 'rgb(192, 132, 252)' : 'rgb(168, 85, 247)', // Warna ungu
+            borderColor: $theme === 'dark' ? 'rgb(192, 132, 252)' : 'rgb(168, 85, 247)',
             backgroundColor: $theme === 'dark' ? 'rgba(192, 132, 252, 0.1)' : 'rgba(168, 85, 247, 0.1)',
             tension: 0.3,
             fill: true,
@@ -93,38 +133,30 @@
           {
             label: 'TDS Voltage',
             data: tdsVData,
-            borderColor: $theme === 'dark' ? 'rgb(251, 146, 60)' : 'rgb(249, 115, 22)', // Warna oranye
+            borderColor: $theme === 'dark' ? 'rgb(251, 146, 60)' : 'rgb(249, 115, 22)',
             backgroundColor: $theme === 'dark' ? 'rgba(251, 146, 60, 0.1)' : 'rgba(249, 115, 22, 0.1)',
             tension: 0.3,
             fill: true,
           }
         ]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            y: { 
-                beginAtZero: false,
-                ticks: { color: $theme === 'dark' ? '#cbd5e1' : '#475569' }
-            },
-            x: {
-                ticks: { color: $theme === 'dark' ? '#cbd5e1' : '#475569' }
-            }
-        },
-        plugins: {
-            legend: {
-                labels: { color: $theme === 'dark' ? '#cbd5e1' : '#475569' }
-            }
-        }
-      }
+      options: getChartOptions()
     });
   }
 
-  // Re-render chart saat theme berubah
-  $: if (chartInstance) updateChart();
+  // Fungsi utama untuk update semua grafik sekaligus
+  function updateAllCharts() {
+    updatePhChart();
+    updateTdsChart();
+    updateVoltageChart();
+  }
 
-  // ## FUNGSI BARU: EKSPOR SEMUA DATA ##
+  // Re-render semua chart saat theme berubah
+  $: if ($theme && (phChartInstance || tdsChartInstance || voltageChartInstance)) {
+    updateAllCharts();
+  }
+
+  // Fungsi Ekspor & Hapus (tidak berubah)
   async function exportAllDataToCsv() {
     isExporting = true;
     exportMessage = '';
@@ -134,28 +166,22 @@
         .from('sensor_logs')
         .select('created_at, ph, tds, ph_v, tds_v, ph_auto')
         .order('created_at', { ascending: true });
-
       if (error) throw error;
-
       if (allData.length === 0) {
         exportError = 'Tidak ada data untuk diekspor.';
         setTimeout(() => exportError = '', 3000);
         return;
       }
-
       const headers = ['Waktu', 'pH Air', 'TDS (ppm)', 'pH Voltage', 'TDS Voltage', 'Siklus Pompa pH'];
       const csvRows = [headers.join(',')];
-
       for (const row of allData) {
         const formattedDate = new Date(row.created_at).toLocaleString('id-ID');
         const values = [ `"${formattedDate}"`, row.ph, row.tds, row.ph_v, row.tds_v, row.ph_auto ];
         csvRows.push(values.join(','));
       }
-
       const csvString = csvRows.join('\n');
       const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
-      
       if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
         const timestamp = new Date().toISOString().slice(0, 10);
@@ -177,7 +203,6 @@
     }
   }
 
-  // ## FUNGSI BARU: HAPUS SEMUA LOG SENSOR ##
   async function handleClearLogs() {
     isClearing = true;
     clearMessage = '';
@@ -185,11 +210,9 @@
     try {
       const { error } = await supabase.from('sensor_logs').delete().gt('id', -1);
       if (error) throw error;
-
       historicalData = [];
       latestLog = { ph: '...', tds: '...', ph_auto: '...', created_at: null, ph_v: '...', tds_v: '...' };
-      updateChart();
-      
+      updateAllCharts();
       clearMessage = '✅ Semua log sensor berhasil dihapus!';
       setTimeout(() => clearMessage = '', 3000);
     } catch (err) {
@@ -216,7 +239,7 @@
       loading = false;
     }
 
-    updateChart();
+    updateAllCharts();
 
     channel = supabase.channel('sensor_logs_realtime_v3')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sensor_logs' },
@@ -228,7 +251,7 @@
             historicalData.shift();
           }
           error = null;
-          updateChart();
+          updateAllCharts();
         }
       )
       .subscribe();
@@ -236,7 +259,9 @@
 
   onDestroy(() => {
     if (channel) supabase.removeChannel(channel);
-    if (chartInstance) chartInstance.destroy();
+    if (phChartInstance) phChartInstance.destroy();
+    if (tdsChartInstance) tdsChartInstance.destroy();
+    if (voltageChartInstance) voltageChartInstance.destroy();
   });
 </script>
 
@@ -265,7 +290,6 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/50 dark:hover:shadow-blue-400/40 cursor-pointer">
             <h2 class="text-lg font-semibold text-slate-500 dark:text-slate-400">pH Air</h2>
-            <!-- ## PERUBAHAN DI SINI ## -->
             <p class="text-5xl font-bold my-4 text-blue-600 dark:text-blue-400">
               {typeof latestLog.ph === 'number' ? latestLog.ph.toFixed(2) : latestLog.ph}
             </p>
@@ -281,10 +305,11 @@
           </div>
         </div>
 
-        <!-- Bagian Grafik -->
-        <div class="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-lg mb-6">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-              <h2 class="text-xl font-bold text-slate-900 dark:text-white">Grafik Sensor</h2>
+        <!-- ## BAGIAN GRAFIK YANG BARU ## -->
+        <div class="space-y-6">
+          <!-- Tombol Export diletakkan di sini -->
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg">
+              <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Analisis Grafik Sensor</h2>
               <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                   <button on:click={exportAllDataToCsv} disabled={isExporting}
                           class="inline-flex items-center justify-center py-2 px-3 border border-slate-300 dark:border-slate-600 shadow-sm text-sm font-medium rounded-md text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all disabled:opacity-50">
@@ -298,14 +323,38 @@
                     {#if exportError}<p class="text-red-600 dark:text-red-400">{exportError}</p>{/if}
                   </div>
               </div>
-            </div>
+          </div>
+
+          <!-- Grid untuk 2 grafik atas -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <!-- Grafik pH -->
+              <div class="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-lg">
+                <h2 class="text-xl font-bold mb-4 text-slate-900 dark:text-white">Grafik pH</h2>
+                <div class="h-80 relative">
+                    <canvas bind:this={phChartCanvas}></canvas>
+                </div>
+              </div>
+
+              <!-- Grafik TDS -->
+              <div class="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-lg">
+                <h2 class="text-xl font-bold mb-4 text-slate-900 dark:text-white">Grafik TDS</h2>
+                <div class="h-80 relative">
+                    <canvas bind:this={tdsChartCanvas}></canvas>
+                </div>
+              </div>
+          </div>
+
+          <!-- Grafik Tegangan -->
+          <div class="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-slate-900 dark:text-white">Grafik Tegangan Sensor</h2>
             <div class="h-80 relative">
-                <canvas bind:this={chartCanvas}></canvas>
+                <canvas bind:this={voltageChartCanvas}></canvas>
             </div>
+          </div>
         </div>
 
-        <!-- ## BAGIAN BARU: ZONA BERBAHAYA ## -->
-        <div class="bg-red-50 dark:bg-slate-800/50 border border-red-200 dark:border-red-900/50 p-6 rounded-xl shadow-lg">
+        <!-- Zona Berbahaya -->
+        <div class="mt-6 bg-red-50 dark:bg-slate-800/50 border border-red-200 dark:border-red-900/50 p-6 rounded-xl shadow-lg">
             <h2 class="text-xl font-bold mb-2 text-red-800 dark:text-red-300">Clear Data</h2>
             <p class="text-slate-600 dark:text-slate-400 mb-4 text-sm">Tindakan berikut bersifat permanen dan tidak dapat diurungkan. Lanjutkan dengan hati-hati.</p>
             <div class="flex items-center gap-4">
