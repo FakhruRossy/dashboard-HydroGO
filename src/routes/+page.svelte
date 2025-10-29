@@ -69,14 +69,17 @@
   };
   const theme = createPersistentTheme();
 
-  // Opsi umum untuk semua grafik agar konsisten
-  const getChartOptions = () => ({
+  // ## PERUBAHAN DI SINI: Opsi umum untuk semua grafik agar konsisten ##
+  // Kita tambahkan parameter 'min' dan 'max'
+  const getChartOptions = (min, max) => ({
     responsive: true,
     maintainAspectRatio: false,
     scales: {
       y: { 
-        beginAtZero: false,
-        ticks: { color: $theme === 'dark' ? '#cbd5e1' : '#475569' }
+        // beginAtZero: false, // Dihapus, karena kita set min secara manual
+        ticks: { color: $theme === 'dark' ? '#cbd5e1' : '#475569' },
+        min: min, // Menetapkan nilai minimum sumbu Y
+        max: max  // Menetapkan nilai maksimum sumbu Y
       },
       x: {
         ticks: { color: $theme === 'dark' ? '#cbd5e1' : '#475569' }
@@ -89,7 +92,7 @@
     }
   });
 
-  // Fungsi-fungsi grafik (tidak berubah)
+  // Fungsi-fungsi grafik
   function updatePhChart() {
     if (phChartInstance) phChartInstance.destroy();
     if (!phChartCanvas) return;
@@ -109,7 +112,8 @@
           fill: true,
         }]
       },
-      options: getChartOptions()
+      // ## PERUBAHAN DI SINI: Set min=0 dan max=14 untuk pH ##
+      options: getChartOptions(0, 14)
     });
   }
 
@@ -132,7 +136,9 @@
           fill: true,
         }]
       },
-      options: getChartOptions()
+      // ## PERUBAHAN DI SINI: Set min=0 dan max=2000 untuk TDS ##
+      // (Kamu bisa ganti 2000 jika perlu rentang lebih besar)
+      options: getChartOptions(0, 2000)
     });
   }
 
@@ -166,7 +172,9 @@
           }
         ]
       },
-      options: getChartOptions()
+      // ## PERUBAHAN DI SINI: Set min=0 dan max=5 untuk Tegangan ##
+      // (Asumsi sensor bekerja di 0-5V)
+      options: getChartOptions(0, 5)
     });
   }
   
@@ -328,7 +336,7 @@
     
     <header class="max-w-7xl mx-auto p-4 md:p-8 flex justify-between items-center">
       <div>
-        <h1 class="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">💧 Dashboard HydroGO</h1>
+        <h1 class="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">💧 Dashboard Hidroponik</h1>
         <p class="text-slate-500 dark:text-slate-400 mt-1">
           {#if loading} Mencari data...
           {:else if latestLog.created_at} Data terakhir: {new Date(latestLog.created_at).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'medium' })}
@@ -413,7 +421,7 @@
               
               <!-- Kolom 1: Target & Kalibrasi -->
               <div class="space-y-6">
-                <h3 class="text-lg font-semibold text-indigo-600 dark:text-indigo-400 border-b pb-2 border-slate-200 dark:border-slate-700">Pengaturan Target</h3>
+                <h3 class="text-lg font-semibold text-indigo-600 dark:text-indigo-400 border-b pb-2 border-slate-200 dark:border-slate-700">🎯 Pengaturan Target</h3>
                 <div class="flex items-center gap-4">
                     <div class="flex-1">
                         <div class="flex items-center gap-1.5">
@@ -453,7 +461,7 @@
                   <input type="number" step="1" id="tds_min" bind:value={config.tds_target_min} class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
                 
-                <h3 class="text-lg font-semibold text-indigo-600 dark:text-indigo-400 border-b pb-2 border-slate-200 dark:border-slate-700 pt-4">Pengaturan Kalibrasi</h3>
+                <h3 class="text-lg font-semibold text-indigo-600 dark:text-indigo-400 border-b pb-2 border-slate-200 dark:border-slate-700 pt-4">🔬 Pengaturan Kalibrasi</h3>
                  <div class="flex items-center gap-4">
                     <div class="flex-1">
                         <div class="flex items-center gap-1.5">
@@ -510,7 +518,7 @@
 
               <!-- Kolom 2: Otomasi -->
               <div class="space-y-6">
-                <h3 class="text-lg font-semibold text-indigo-600 dark:text-indigo-400 border-b pb-2 border-slate-200 dark:border-slate-700">Pengaturan Otomasi</h3>
+                <h3 class="text-lg font-semibold text-indigo-600 dark:text-indigo-400 border-b pb-2 border-slate-200 dark:border-slate-700">🤖 Pengaturan Otomasi</h3>
                 <div class="flex items-center justify-between bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg">
                   <div class="flex items-center gap-1.5">
                     <label for="is_automation_active" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Status Automasi</label>
@@ -605,7 +613,7 @@
 
               <!-- Kolom 3: Sistem -->
               <div class="space-y-6">
-                <h3 class="text-lg font-semibold text-indigo-600 dark:text-indigo-400 border-b pb-2 border-slate-200 dark:border-slate-700">Pengaturan Sistem</h3>
+                <h3 class="text-lg font-semibold text-indigo-600 dark:text-indigo-400 border-b pb-2 border-slate-200 dark:border-slate-700">📡 Pengaturan Sistem</h3>
                 <div>
                   <div class="flex items-center gap-1.5">
                     <label for="supabase_send_interval_ms" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Interval Kirim Data (ms)</label>
@@ -649,7 +657,7 @@
 
         <!-- Zona Berbahaya -->
         <div class="mt-6 bg-red-50 dark:bg-slate-800/50 border border-red-200 dark:border-red-900/50 p-6 rounded-xl shadow-lg">
-            <h2 class="text-xl font-bold mb-2 text-red-800 dark:text-red-300">Clear Data</h2>
+            <h2 class="text-xl font-bold mb-2 text-red-800 dark:text-red-300">Zona Berbahaya</h2>
             <p class="text-slate-600 dark:text-slate-400 mb-4 text-sm">Tindakan berikut bersifat permanen dan tidak dapat diurungkan. Lanjutkan dengan hati-hati.</p>
             <div class="flex items-center gap-4">
                 <button on:click={handleClearLogs} disabled={isClearing}
