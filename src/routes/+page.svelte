@@ -54,7 +54,7 @@
   let configSaveError = '';
 
 
-  // Logika Tema (tidak berubah)
+  // Logika Tema 
   const createPersistentTheme = () => {
     if (typeof window === 'undefined') return writable('light');
     const storedTheme = localStorage.getItem('theme');
@@ -69,8 +69,7 @@
   };
   const theme = createPersistentTheme();
 
-  // ## PERUBAHAN DI SINI: Opsi umum untuk semua grafik agar konsisten ##
-  // Kita tambahkan parameter 'min' dan 'max'
+  // tambahkan parameter 'min' dan 'max'
   const getChartOptions = (min, max) => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -92,7 +91,7 @@
     }
   });
 
-  // Fungsi-fungsi grafik
+  // fungsi grafik
   function updatePhChart() {
     if (phChartInstance) phChartInstance.destroy();
     if (!phChartCanvas) return;
@@ -112,7 +111,7 @@
           fill: true,
         }]
       },
-      // ## PERUBAHAN DI SINI: Set min=0 dan max=14 untuk pH ##
+      
       options: getChartOptions(0, 14)
     });
   }
@@ -136,7 +135,7 @@
           fill: true,
         }]
       },
-      // ## PERUBAHAN DI SINI: Set min=0 dan max=2000 untuk TDS ##
+      
       // (Kamu bisa ganti 2000 jika perlu rentang lebih besar)
       options: getChartOptions(0, 2000)
     });
